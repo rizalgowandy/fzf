@@ -9,6 +9,10 @@ import (
 	"github.com/junegunn/fzf/src/util"
 )
 
+func init() {
+	Init("default")
+}
+
 func assertMatch(t *testing.T, fun Algo, caseSensitive, forward bool, input, pattern string, sidx int, eidx int, score int) {
 	assertMatch2(t, fun, caseSensitive, false, forward, input, pattern, sidx, eidx, score)
 }
@@ -195,4 +199,13 @@ func TestLongString(t *testing.T) {
 	}
 	bytes[math.MaxUint16] = 'z'
 	assertMatch(t, FuzzyMatchV2, true, true, string(bytes), "zx", math.MaxUint16, math.MaxUint16+2, scoreMatch*2+bonusConsecutive)
+}
+
+func TestLongStringWithNormalize(t *testing.T) {
+	bytes := make([]byte, 30000)
+	for i := range bytes {
+		bytes[i] = 'x'
+	}
+	unicodeString := string(bytes) + " Minímal example"
+	assertMatch2(t, FuzzyMatchV1, false, true, false, unicodeString, "minim", 30001, 30006, 140)
 }
