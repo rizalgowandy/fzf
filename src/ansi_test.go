@@ -335,6 +335,28 @@ func TestExtractColor(t *testing.T) {
 		assert((*offsets)[0], 0, 6, 2, -1, true)
 		assert((*offsets)[1], 6, 11, 200, 100, false)
 	})
+
+	state = nil
+	var color24 tui.Color = (1 << 24) + (180 << 16) + (190 << 8) + 254
+	src = "\x1b[1mhello \x1b[22;1;38:2:180:190:254mworld"
+	check(func(offsets *[]ansiOffset, state *ansiState) {
+		if len(*offsets) != 2 {
+			t.Fail()
+		}
+		if state.fg != color24 || state.attr != 1 {
+			t.Fail()
+		}
+		assert((*offsets)[0], 0, 6, -1, -1, true)
+		assert((*offsets)[1], 6, 11, color24, -1, true)
+	})
+
+	src = "\x1b]133;A\x1b\\hello \x1b]133;C\x1b\\world"
+	check(func(offsets *[]ansiOffset, state *ansiState) {
+		if len(*offsets) != 1 {
+			t.Fail()
+		}
+		assert((*offsets)[0], 0, 11, color24, -1, true)
+	})
 }
 
 func TestAnsiCodeStringConversion(t *testing.T) {
@@ -342,12 +364,15 @@ func TestAnsiCodeStringConversion(t *testing.T) {
 		state := interpretCode(code, prevState)
 		if expected != state.ToString() {
 			t.Errorf("expected: %s, actual: %s",
-				strings.Replace(expected, "\x1b[", "\\x1b[", -1),
-				strings.Replace(state.ToString(), "\x1b[", "\\x1b[", -1))
+				strings.ReplaceAll(expected, "\x1b[", "\\x1b["),
+				strings.ReplaceAll(state.ToString(), "\x1b[", "\\x1b["))
 		}
 	}
 	assert("\x1b[m", nil, "")
 	assert("\x1b[m", &ansiState{attr: tui.Blink, lbg: -1}, "")
+	assert("\x1b[0m", &ansiState{fg: 4, bg: 4, lbg: -1}, "")
+	assert("\x1b[;m", &ansiState{fg: 4, bg: 4, lbg: -1}, "")
+	assert("\x1b[;;m", &ansiState{fg: 4, bg: 4, lbg: -1}, "")
 
 	assert("\x1b[31m", nil, "\x1b[31;49m")
 	assert("\x1b[41m", nil, "\x1b[39;41m")
@@ -378,7 +403,7 @@ func TestParseAnsiCode(t *testing.T) {
 		{"-2", "", -1},
 	}
 	for _, x := range tests {
-		n, _, s := parseAnsiCode(x.In, 0)
+		n, s := parseAnsiCode(x.In)
 		if n != x.N || s != x.Exp {
 			t.Fatalf("%q: got: (%d %q) want: (%d %q)", x.In, n, s, x.N, x.Exp)
 		}
